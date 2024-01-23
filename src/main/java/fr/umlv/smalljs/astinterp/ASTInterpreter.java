@@ -38,25 +38,34 @@ public class ASTInterpreter {
   static Object visit(Expr expression, JSObject env) {
     return switch (expression) {
       case Block(List<Expr> instrs, int lineNumber) -> {
-				//throw new UnsupportedOperationException("TODO Block");
-        // TODO loop over all instructions
+        instrs.forEach(expr -> visit(expr, env));
         yield UNDEFINED;
       }
-      case Literal<?>(Object value, int lineNumber) -> {
-        throw new UnsupportedOperationException("TODO Literal");
-      }
+      case Literal<?>(Object value, int lineNumber) -> value;
       case FunCall(Expr qualifier, List<Expr> args, int lineNumber) -> {
-        throw new UnsupportedOperationException("TODO FunCall");
+        var expectedFunctionName = visit(qualifier, env);
+          if (!(expectedFunctionName instanceof JSObject jsObject)) {
+            throw new Failure("not a function " + expectedFunctionName + " at line " + lineNumber);
+          }
+          var interpretedArgs = args.stream()
+                  .map(expr -> visit(expr, env))
+                  .toArray();
+          yield jsObject.invoke(UNDEFINED, interpretedArgs);
       }
-      case LocalVarAccess(String name, int lineNumber) -> {
-        throw new UnsupportedOperationException("TODO LocalVarAccess");
-      }
+      case LocalVarAccess(String name, int lineNumber) -> env.lookup(name);
       case LocalVarAssignment(String name, Expr expr, boolean declaration, int lineNumber) -> {
-        throw new UnsupportedOperationException("TODO LocalVarAssignment");
+        var localVarCurrentValue = env.lookup(name);
+        if (declaration && localVarCurrentValue != UNDEFINED) {
+          throw new Failure("declaration to already defined variable " + name + " at line " + lineNumber);
+        }
+        if (!declaration && localVarCurrentValue == UNDEFINED) {
+          throw new Failure("assignation to undefined variable " + name + " at line " + lineNumber);
+        }
+        var variableValue = visit(expr, env);
+        env.register(name, variableValue);
+        yield UNDEFINED;
       }
       case Fun(Optional<String> optName, List<String> parameters, Block body, int lineNumber) -> {
-				throw new UnsupportedOperationException("TODO Fun");
-        //var functionName = optName.orElse("lambda");
         //Invoker invoker = new Invoker() {
         //  @Override
         //  public Object invoke(JSObject self, Object receiver, Object... args) {
@@ -66,15 +75,35 @@ public class ASTInterpreter {
         //    // visit the body
         //  }
         //};
-        // create the JS function with the invoker
-        // register it if necessary
-        // yield the function
+        var functionName = optName.orElse("lambda");
+        Invoker invoker = (self, receiver, args) -> {
+          if (args.length != parameters.size()) {
+            throw new Failure("expected " + parameters.size() + " arguments, " + args.length + " arguments given to function at line " + lineNumber);
+          }
+          var localEnv = JSObject.newEnv(env);
+          localEnv.register("this", receiver);
+          for (int i = 0; i < args.length; i++) {
+            localEnv.register(parameters.get(i), args[i]);
+          }
+          try {
+            return visit(body, localEnv);
+          } catch (ReturnError returnError) {
+            return returnError.getValue();
+          }
+        };
+        var function = JSObject.newFunction(functionName, invoker);
+        optName.ifPresent(name -> env.register(name, function));
+        yield function;
       }
       case Return(Expr expr, int lineNumber) -> {
-				throw new UnsupportedOperationException("TODO Return");
+        throw new ReturnError(visit(expr, env));
       }
       case If(Expr condition, Block trueBlock, Block falseBlock, int lineNumber) -> {
-				throw new UnsupportedOperationException("TODO If");
+        var conditionValue = visit(condition, env);
+        if (conditionValue instanceof Integer value && value == 0) {
+          yield visit(falseBlock, env);
+        }
+        yield visit(trueBlock, env);
       }
       case New(Map<String, Expr> initMap, int lineNumber) -> {
 				throw new UnsupportedOperationException("TODO New");

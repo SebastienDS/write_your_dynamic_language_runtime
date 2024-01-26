@@ -44,13 +44,13 @@ public class ASTInterpreter {
       case Literal<?>(Object value, int lineNumber) -> value;
       case FunCall(Expr qualifier, List<Expr> args, int lineNumber) -> {
         var expectedFunctionName = visit(qualifier, env);
-          if (!(expectedFunctionName instanceof JSObject jsObject)) {
-            throw new Failure("not a function " + expectedFunctionName + " at line " + lineNumber);
-          }
-          var interpretedArgs = args.stream()
-                  .map(expr -> visit(expr, env))
-                  .toArray();
-          yield jsObject.invoke(UNDEFINED, interpretedArgs);
+        if (!(expectedFunctionName instanceof JSObject jsObject)) {
+          throw new Failure("not a function " + expectedFunctionName + " at line " + lineNumber);
+        }
+        var interpretedArgs = args.stream()
+                .map(expr -> visit(expr, env))
+                .toArray();
+        yield jsObject.invoke(UNDEFINED, interpretedArgs);
       }
       case LocalVarAccess(String name, int lineNumber) -> env.lookup(name);
       case LocalVarAssignment(String name, Expr expr, boolean declaration, int lineNumber) -> {
@@ -66,15 +66,6 @@ public class ASTInterpreter {
         yield UNDEFINED;
       }
       case Fun(Optional<String> optName, List<String> parameters, Block body, int lineNumber) -> {
-        //Invoker invoker = new Invoker() {
-        //  @Override
-        //  public Object invoke(JSObject self, Object receiver, Object... args) {
-        //    // check the arguments length
-        //    // create a new environment
-        //    // add this and all the parameters
-        //    // visit the body
-        //  }
-        //};
         var functionName = optName.orElse("lambda");
         Invoker invoker = (self, receiver, args) -> {
           if (args.length != parameters.size()) {
@@ -106,16 +97,39 @@ public class ASTInterpreter {
         yield visit(trueBlock, env);
       }
       case New(Map<String, Expr> initMap, int lineNumber) -> {
-				throw new UnsupportedOperationException("TODO New");
+        var jsObject = JSObject.newObject(null);
+        initMap.forEach((k, v) ->jsObject.register(k, visit(v, env)));
+        yield jsObject;
       }
       case FieldAccess(Expr receiver, String name, int lineNumber) -> {
-        throw new UnsupportedOperationException("TODO FieldAccess");
+        var expectedJsObject = visit(receiver, env);
+        if (!(expectedJsObject instanceof JSObject jsObject)) {
+          throw new Failure("Cannot access field to not variable " + expectedJsObject + " at line " + lineNumber);
+        }
+        yield jsObject.lookup(name);
       }
       case FieldAssignment(Expr receiver, String name, Expr expr, int lineNumber) -> {
-        throw new UnsupportedOperationException("TODO FieldAssignment");
+        var expectedJsObject = visit(receiver, env);
+        if (!(expectedJsObject instanceof JSObject jsObject)) {
+          throw new Failure("Cannot assign field to variable " + expectedJsObject + " at line " + lineNumber);
+        }
+        jsObject.register(name, visit(expr, env));
+        yield UNDEFINED;
       }
       case MethodCall(Expr receiver, String name, List<Expr> args, int lineNumber) -> {
-        throw new UnsupportedOperationException("TODO MethodCall");
+        var expectedObjectName = visit(receiver, env);
+        if (!(expectedObjectName instanceof JSObject jsObject)) {
+          throw new Failure("not a object " + expectedObjectName + " at line " + lineNumber);
+        }
+        var interpretedArgs = args.stream()
+                .map(expr -> visit(expr, env))
+                .toArray();
+
+        var expectedMethod = jsObject.lookup(name);
+        if (!(expectedMethod instanceof JSObject methodObject)) {
+          throw new Failure("not a method " + expectedMethod + " at line " + lineNumber);
+        }
+        yield methodObject.invoke(jsObject, interpretedArgs);
       }
     };
   }

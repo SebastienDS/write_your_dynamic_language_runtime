@@ -227,14 +227,14 @@ public class StackInterpreter {
 
 					// save bp/pc/code in activation zone
 					// stack[activation + offset] = ??
-					var activation = sp;
+					var activation = sp + code.slotCount();
 					stack[activation + BP_OFFSET] = bp;
 					stack[activation + PC_OFFSET] = pc;
 					stack[activation + FUN_OFFSET] = encodeDictObject(function, dict);
 
 					// initialize pc, bp and sp
 					pc = 0;
-					bp = 0;
+					bp = sp;
 					sp = bp + code.slotCount() + ACTIVATION_SIZE; // stack pointer
 
 					// initialize all locals that are not parameters

@@ -221,66 +221,61 @@ public class InstrRewriter {
 				buffer.emit(RET);
 			}
 			case If(Expr condition, Block trueBlock, Block falseBlock, int lineNumber) -> {
-				throw new UnsupportedOperationException("TODO If");
 				// visit the condition
-				//visit(...);
+				visit(condition, env, buffer, dict, globalEnv);
 				// emit a JUMP_IF_FALSE and a placeholder
-				//var falsePlaceHolder = buffer.emit(JUMP_IF_FALSE).placeholder();
+				var falsePlaceHolder = buffer.emit(JUMP_IF_FALSE).placeholder();
 				// visit the true block
-				//visit(...);
+				visit(trueBlock, env, buffer, dict, globalEnv);
 				// emit a goto with another placeholder
-				//var endPlaceHolder = buffer.emit(GOTO).placeholder();
+				var endPlaceHolder = buffer.emit(GOTO).placeholder();
 				// patch the first placeholder
-				//buffer.patch(..., buffer.label());
+				buffer.patch(falsePlaceHolder, buffer.label());
 				// visit the false block
-				//visit(...);
+				visit(falseBlock, env, buffer, dict, globalEnv);
 				// patch the second placeholder
-				//buffer.patch(..., buffer.label());
+				buffer.patch(endPlaceHolder, buffer.label());
 			}
 			case New(Map<String, Expr> initMap, int lineNumber) -> {
-				throw new UnsupportedOperationException("TODO New");
 				// create a JSObject class
-				//var clazz = JSObject.newObject(null);
+				var clazz = JSObject.newObject(null);
 				// loop over all the field initializations
-				//initMap().forEach((fieldName, expr) -> {
+				initMap.forEach((fieldName, expr) -> {
 				//  register the field name with the right slot
-				//  clazz.register(...);
+			  		clazz.register(fieldName, clazz.length());
 				//   visit the initialization expression
-				//  visit(...);
-				//});
+	  				visit(expr, env, buffer, dict, globalEnv);
+				});
 				// emit a NEW with the class
-				//buffer.emit(...).emit(...);
+				buffer.emit(NEW).emit(encodeDictObject(clazz, dict));
 			}
 			case FieldAccess(Expr receiver, String name, int lineNumber) -> {
-				throw new UnsupportedOperationException("TODO FieldAccess");
 				// visit the receiver
-				//visit(...);
+				visit(receiver, env, buffer, dict, globalEnv);
 				// emit a GET with the field name
-				//buffer.emit(...).emit(...);
+				buffer.emit(GET).emit(encodeDictObject(name, dict));
 			}
 			case FieldAssignment(Expr receiver, String name, Expr expr, int lineNumber) -> {
-				throw new UnsupportedOperationException("TODO FieldAssignment");
 				// visit the receiver
-				//visit(...);
+				visit(receiver, env, buffer, dict, globalEnv);
 				// visit the expression
-				//visit(...);
+				visit(expr, env, buffer, dict, globalEnv);
 				// emit a PUT with the field name
-				//buffer.emit(...).emit(...);
+				buffer.emit(PUT).emit(encodeDictObject(name, dict));
 			}
 			case MethodCall(Expr receiver, String name, List<Expr> args, int lineNumber) -> {
-				throw new UnsupportedOperationException("TODO MethodCall");
 				// visit the receiver
-				//visit(...);
+				visit(receiver, env, buffer, dict, globalEnv);
 				// emit a DUP, get the field name and emit a SWAP of the qualifier and the receiver
-				//buffer.emit(DUP);
-				//buffer.emit(...).emit(...);
-				//buffer.emit(SWAP);
+				buffer.emit(DUP);
+				buffer.emit(GET).emit(encodeDictObject(name, dict));
+				buffer.emit(SWAP);
 				// visit all arguments
-				//for (var arg : args) {
-				  //visit(...);
-				//}
+				for (var arg : args) {
+				  visit(arg, env, buffer, dict, globalEnv);
+				}
 				// emit the funcall
-				//buffer.emit(...).emit(...);
+				buffer.emit(FUNCALL).emit(args.size());
 			}
 		}
 	}
